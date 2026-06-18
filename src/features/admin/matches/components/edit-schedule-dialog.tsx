@@ -1,0 +1,164 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { ArrowLeftRight } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  getErrorMessage,
+  useAdminMessage,
+} from "@/features/admin/lib/use-admin-message";
+import { updateMatch, swapMatchTeams } from "@/features/matches/api/matches.mutations";
+import type { Match } from "@/features/matches/types/match.types";
+import {
+  fromDatetimeLocalValue,
+  toDatetimeLocalValue,
+} from "@/lib/date-utils";
+import { MatchTeamCell } from "./match-team-cell";
+
+type EditScheduleDialogProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  match: Match | null;
+  onSuccess: (updated?: Match) => void;
+};
+
+export function EditScheduleDialog({
+  open,
+  onOpenChange,
+  match,
+  onSuccess,
+}: EditScheduleDialogProps) {
+  const { showError } = useAdminMessage();
+  const [matchNumber, setMatchNumber] = useState(1);
+  const [matchDate, setMatchDate] = useState("");
+  const [stadium, setStadium] = useState("");
+  const [homeTeam, setHomeTeam] = useState<Match["homeTeamId"]>("");
+  const [awayTeam, setAwayTeam] = useState<Match["awayTeamId"]>("");
+  const [error, setError] = useState<string | null>(null);
+
+  const teamsLocked =
+    match?.status === "completed" || match?.status === "cancelled";
+
+  useEffect(() => {
+    if (match) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset form when match changes
+      setMatchNumber(match.matchNumber);
+      setMatchDate(toDatetimeLocalValue(match.matchDate));
+      setStadium(match.stadium ?? "");
+      setHomeTeam(match.homeTeamId);
+      setAwayTeam(match.awayTeamId);
+      setError(null);
+    }
+  }, [match, open]);
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      updateMatch(match!._id, {
+        matchNumber,
+        matchDate: matchDate ? fromDatetimeLocalValue(matchDate) : undefined,
+        stadium: stadium || undefined,
+      }),
+    onSuccess: () => {
+      onSuccess();
+      onOpenChange(false);
+    },
+    onError: (e) => showError(getErrorMessage(e)),
+  });
+
+  const swapMutation = useMutation({
+    mutationFn: () => swapMatchTeams(match!._id),
+    onSuccess: (updated) => {
+      setHomeTeam(updated.homeTeamId);
+      setAwayTeam(updated.awayTeamId);
+      onSuccess(updated);
+    },
+    onError: (e) => showError(getErrorMessage(e)),
+  });
+
+  const handleSubmit = () => {
+    if (matchNumber < 1) {
+      setError("Match number must be at least 1");
+      return;
+    }
+    mutation.mutate();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit Match</DialogTitle>
+        </DialogHeader>
+        {match && (
+          <div className="flex items-center justify-between gap-2 rounded-lg border bg-muted/30 p-3 text-sm">
+            <MatchTeamCell team={homeTeam} />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              className="shrink-0"
+              disabled={teamsLocked || swapMutation.isPending}
+              title="Swap home and away"
+              onClick={() => swapMutation.mutate()}
+            >
+              <ArrowLeftRight />
+            </Button>
+            <MatchTeamCell team={awayTeam} align="right" />
+          </div>
+        )}
+        <div className="grid gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="matchNumber">Match Number</Label>
+            <Input
+              id="matchNumber"
+              type="number"
+              min={1}
+              value={matchNumber}
+              onChange={(e) => setMatchNumber(Number(e.target.value))}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="matchDate">Match Date</Label>
+            <Input
+              id="matchDate"
+              type="datetime-local"
+              value={matchDate}
+              onChange={(e) => setMatchDate(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="stadium">Stadium</Label>
+            <Input
+              id="stadium"
+              value={stadium}
+              onChange={(e) => setStadium(e.target.value)}
+            />
+          </div>
+        </div>
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={mutation.isPending}
+          >
+            {mutation.isPending ? "Saving..." : "Save"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
