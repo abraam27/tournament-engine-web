@@ -126,8 +126,7 @@ function MatchesManagementInner() {
                 <TableHead>Score</TableHead>
                 <TableHead className={`${TEAM_COLUMN_CLASS} text-right`}>Away</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Stadium</TableHead>
+                <TableHead className="min-w-44">Schedule</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -142,14 +141,20 @@ function MatchesManagementInner() {
                   <TableCell>
                     <MatchScore match={match} />
                   </TableCell>
-                  <TableCell className={`${TEAM_COLUMN_CLASS} text-right`}>
-                    <MatchTeamCell team={match.awayTeamId} align="right" />
+                  <TableCell className={TEAM_COLUMN_CLASS}>
+                    <MatchTeamCell team={match.awayTeamId} side="away" />
                   </TableCell>
                   <TableCell>
                     <MatchStatusBadge status={match.status} />
                   </TableCell>
-                  <TableCell>{formatMatchDate(match.matchDate)}</TableCell>
-                  <TableCell>{match.stadium ?? "—"}</TableCell>
+                  <TableCell className="min-w-44">
+                    <div className="space-y-0.5">
+                      <p>{formatMatchDate(match.matchDate)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {match.stadium || "No stadium set"}
+                      </p>
+                    </div>
+                  </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
                       <Button

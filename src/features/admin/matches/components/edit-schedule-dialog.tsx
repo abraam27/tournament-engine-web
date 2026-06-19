@@ -18,8 +18,12 @@ import {
   getErrorMessage,
   useAdminMessage,
 } from "@/features/admin/lib/use-admin-message";
-import { updateMatch, swapMatchTeams } from "@/features/matches/api/matches.mutations";
+import {
+  updateMatch,
+  swapMatchTeams,
+} from "@/features/matches/api/matches.mutations";
 import type { Match } from "@/features/matches/types/match.types";
+import { formatMatchDate } from "@/features/matches/lib/match-utils";
 import {
   fromDatetimeLocalValue,
   toDatetimeLocalValue,
@@ -63,12 +67,15 @@ export function EditScheduleDialog({
   }, [match, open]);
 
   const mutation = useMutation({
-    mutationFn: () =>
-      updateMatch(match!._id, {
+    mutationFn: () => {
+      const trimmedStadium = stadium.trim();
+
+      return updateMatch(match!._id, {
         matchNumber,
         matchDate: matchDate ? fromDatetimeLocalValue(matchDate) : undefined,
-        stadium: stadium || undefined,
-      }),
+        stadium: trimmedStadium || undefined,
+      });
+    },
     onSuccess: () => {
       onSuccess();
       onOpenChange(false);
@@ -101,20 +108,38 @@ export function EditScheduleDialog({
           <DialogTitle>Edit Match</DialogTitle>
         </DialogHeader>
         {match && (
-          <div className="flex items-center justify-between gap-2 rounded-lg border bg-muted/30 p-3 text-sm">
-            <MatchTeamCell team={homeTeam} />
-            <Button
-              type="button"
-              variant="outline"
-              size="icon-sm"
-              className="shrink-0"
-              disabled={teamsLocked || swapMutation.isPending}
-              title="Swap home and away"
-              onClick={() => swapMutation.mutate()}
-            >
-              <ArrowLeftRight />
-            </Button>
-            <MatchTeamCell team={awayTeam} align="right" />
+          <div className="space-y-2 rounded-lg border bg-muted/30 p-3 text-sm">
+            <div className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <MatchTeamCell team={homeTeam} side="home" />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                className="shrink-0"
+                disabled={teamsLocked || swapMutation.isPending}
+                title="Swap home and away"
+                onClick={() => swapMutation.mutate()}
+              >
+                <ArrowLeftRight />
+              </Button>
+              <div className="min-w-0 flex-1">
+                <MatchTeamCell team={awayTeam} side="away" />
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 border-t pt-2 text-xs text-muted-foreground">
+              <span>
+                <span className="font-medium text-foreground">Date:</span>{" "}
+                {matchDate
+                  ? formatMatchDate(fromDatetimeLocalValue(matchDate))
+                  : formatMatchDate(match.matchDate)}
+              </span>
+              <span>
+                <span className="font-medium text-foreground">Stadium:</span>{" "}
+                {stadium.trim() || match.stadium || "—"}
+              </span>
+            </div>
           </div>
         )}
         <div className="grid gap-4">
