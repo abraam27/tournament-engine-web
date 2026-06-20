@@ -17,6 +17,8 @@ type ConfirmDeleteDialogProps = {
   description: string;
   onConfirm: () => void;
   loading?: boolean;
+  confirmLabel?: string;
+  loadingLabel?: string;
 };
 
 export function ConfirmDeleteDialog({
@@ -26,6 +28,8 @@ export function ConfirmDeleteDialog({
   description,
   onConfirm,
   loading = false,
+  confirmLabel = "Delete",
+  loadingLabel = "Deleting...",
 }: ConfirmDeleteDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -47,7 +51,7 @@ export function ConfirmDeleteDialog({
             onClick={onConfirm}
             disabled={loading}
           >
-            {loading ? "Deleting..." : "Delete"}
+            {loading ? loadingLabel : confirmLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

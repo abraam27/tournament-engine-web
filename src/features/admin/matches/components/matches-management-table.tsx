@@ -20,7 +20,7 @@ import {
 } from "@/features/admin/lib/use-admin-message";
 import { getGroups } from "@/features/groups/api/groups.api";
 import { getMatches } from "@/features/matches/api/matches.api";
-import { deleteMatch, swapMatchTeams } from "@/features/matches/api/matches.mutations";
+import { deleteMatch, resetMatchResult, swapMatchTeams } from "@/features/matches/api/matches.mutations";
 import { MatchesFilters } from "@/features/matches/components/matches-filters";
 import { MatchScore } from "@/features/matches/components/match-score";
 import { MatchStatusBadge } from "@/features/matches/components/match-status-badge";
@@ -64,6 +64,7 @@ function MatchesManagementInner() {
   const [scheduleMatch, setScheduleMatch] = useState<Match | null>(null);
   const [resultMatch, setResultMatch] = useState<Match | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Match | null>(null);
+  const [resetTarget, setResetTarget] = useState<Match | null>(null);
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteMatch(id),
@@ -89,6 +90,18 @@ function MatchesManagementInner() {
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["matches"] });
+
+  const resetMutation = useMutation({
+    mutationFn: (id: string) => resetMatchResult(id),
+    onSuccess: () => {
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ["knockout-bracket"] });
+      queryClient.invalidateQueries({ queryKey: ["standings"] });
+      showSuccess("Match result reset");
+      setResetTarget(null);
+    },
+    onError: (e) => showError(getErrorMessage(e)),
+  });
 
   if (tournamentsLoading) {
     return <p className="text-sm text-muted-foreground">Loading...</p>;
@@ -180,14 +193,24 @@ function MatchesManagementInner() {
                       <Button
                         size="sm"
                         variant="outline"
-                        disabled={
-                          match.status === "completed" ||
-                          match.status === "cancelled"
-                        }
+                        disabled={match.status === "cancelled"}
                         onClick={() => setResultMatch(match)}
                       >
-                        Result
+                        {match.status === "completed" || match.status === "live"
+                          ? "View"
+                          : "Result"}
                       </Button>
+                      {(match.status === "completed" ||
+                        match.status === "live") && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={resetMutation.isPending}
+                          onClick={() => setResetTarget(match)}
+                        >
+                          Reset
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="destructive"
@@ -223,8 +246,20 @@ function MatchesManagementInner() {
         match={resultMatch}
         onSuccess={() => {
           invalidate();
+          queryClient.invalidateQueries({ queryKey: ["knockout-bracket"] });
+          queryClient.invalidateQueries({ queryKey: ["standings"] });
           showSuccess("Result submitted");
         }}
+      />
+      <ConfirmDeleteDialog
+        open={!!resetTarget}
+        onOpenChange={(o) => !o && setResetTarget(null)}
+        title="Reset match result?"
+        description={`Clear the score for match ${resetTarget?.matchNumber} and set it back to scheduled.`}
+        loading={resetMutation.isPending}
+        confirmLabel="Reset"
+        loadingLabel="Resetting..."
+        onConfirm={() => resetTarget && resetMutation.mutate(resetTarget._id)}
       />
       <ConfirmDeleteDialog
         open={!!deleteTarget}

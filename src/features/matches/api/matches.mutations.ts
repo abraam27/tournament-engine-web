@@ -79,6 +79,11 @@ export async function submitMatchResult(
   return extractItem<Match>(response.data) ?? response.data;
 }
 
+export async function resetMatchResult(id: string): Promise<Match> {
+  const response = await apiClient.delete(`/matches/${id}/result`);
+  return extractItem<Match>(response.data) ?? response.data;
+}
+
 export async function deleteMatch(id: string): Promise<void> {
   await apiClient.delete(`/matches/${id}`);
 }

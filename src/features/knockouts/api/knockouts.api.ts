@@ -3,28 +3,19 @@ import { extractItem } from "@/lib/api-utils";
 
 import type { MatchRound } from "@/features/matches/types/match.types";
 
-export type KnockoutBracket = {
-  tournamentId?: string;
-  rounds?: BracketRound[];
-  [key: string]: unknown;
-};
+import { parseKnockoutBracket } from "../lib/bracket-utils";
+import type { KnockoutBracketResponse } from "../types/bracket.types";
 
-export type BracketRound = {
-  round?: string;
-  matches?: unknown[];
-  scheduled?: number;
-  completed?: number;
-  total?: number;
-};
+export type { BracketMatchData, KnockoutBracketResponse } from "../types/bracket.types";
 
 export async function getKnockoutBracket(
   tournamentId: string,
-): Promise<KnockoutBracket | null> {
+): Promise<KnockoutBracketResponse | null> {
   try {
     const response = await apiClient.get(
       `/knockouts/tournaments/${tournamentId}/bracket`,
     );
-    return extractItem<KnockoutBracket>(response.data) ?? response.data;
+    return parseKnockoutBracket(response.data);
   } catch {
     return null;
   }
@@ -57,5 +48,5 @@ export async function generateNextRound(
     `/knockouts/tournaments/${tournamentId}/generate-next-round`,
     { currentRound },
   );
-  return response.data;
+  return extractItem(response.data) ?? response.data;
 }

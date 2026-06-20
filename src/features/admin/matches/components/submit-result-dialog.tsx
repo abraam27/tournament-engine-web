@@ -19,6 +19,7 @@ import {
   useAdminMessage,
 } from "@/features/admin/lib/use-admin-message";
 import {
+  resetMatchResult,
   submitMatchResult,
   type MatchResultPayload,
 } from "@/features/matches/api/matches.mutations";
@@ -40,8 +41,11 @@ export function SubmitResultDialog({
 }: SubmitResultDialogProps) {
   const { showError } = useAdminMessage();
   const isKnockout = match?.round !== "group";
-  const isLocked =
-    match?.status === "completed" || match?.status === "cancelled";
+  const isCancelled = match?.status === "cancelled";
+  const hasResult =
+    match?.status === "completed" || match?.status === "live";
+  const canSubmit = match?.status === "scheduled" || match?.status === "live";
+  const canReset = hasResult && !isCancelled;
 
   const [form, setForm] = useState<MatchResultPayload>({
     homeScore: 0,
@@ -68,8 +72,17 @@ export function SubmitResultDialog({
     setError(null);
   }, [match, open]);
 
-  const mutation = useMutation({
+  const submitMutation = useMutation({
     mutationFn: () => submitMatchResult(match!._id, form),
+    onSuccess: () => {
+      onSuccess();
+      onOpenChange(false);
+    },
+    onError: (e) => showError(getErrorMessage(e)),
+  });
+
+  const resetMutation = useMutation({
+    mutationFn: () => resetMatchResult(match!._id),
     onSuccess: () => {
       onSuccess();
       onOpenChange(false);
@@ -82,7 +95,7 @@ export function SubmitResultDialog({
       setError("Scores must be >= 0");
       return;
     }
-    mutation.mutate();
+    submitMutation.mutate();
   };
 
   return (
@@ -90,7 +103,8 @@ export function SubmitResultDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            Submit Result — Match {match?.matchNumber}
+            {hasResult ? "Match Result" : "Submit Result"} — Match{" "}
+            {match?.matchNumber}
           </DialogTitle>
         </DialogHeader>
         {match && (
@@ -98,9 +112,9 @@ export function SubmitResultDialog({
             {getTeamName(match.homeTeamId)} vs {getTeamName(match.awayTeamId)}
           </p>
         )}
-        {isLocked ? (
+        {isCancelled ? (
           <p className="text-sm text-destructive">
-            This match is {match?.status} and cannot be updated.
+            This match is cancelled and cannot be updated.
           </p>
         ) : (
           <div className="grid gap-4">
@@ -111,6 +125,7 @@ export function SubmitResultDialog({
                   type="number"
                   min={0}
                   value={form.homeScore}
+                  disabled={!canSubmit}
                   onChange={(e) =>
                     setForm({ ...form, homeScore: Number(e.target.value) })
                   }
@@ -122,6 +137,7 @@ export function SubmitResultDialog({
                   type="number"
                   min={0}
                   value={form.awayScore}
+                  disabled={!canSubmit}
                   onChange={(e) =>
                     setForm({ ...form, awayScore: Number(e.target.value) })
                   }
@@ -133,6 +149,7 @@ export function SubmitResultDialog({
                 <div className="flex items-center gap-2">
                   <Checkbox
                     checked={form.hasExtraTime}
+                    disabled={!canSubmit}
                     onCheckedChange={(c) =>
                       setForm({ ...form, hasExtraTime: !!c })
                     }
@@ -146,6 +163,7 @@ export function SubmitResultDialog({
                       <Input
                         type="number"
                         min={0}
+                        disabled={!canSubmit}
                         value={form.extraTimeHomeScore ?? ""}
                         onChange={(e) =>
                           setForm({
@@ -160,6 +178,7 @@ export function SubmitResultDialog({
                       <Input
                         type="number"
                         min={0}
+                        disabled={!canSubmit}
                         value={form.extraTimeAwayScore ?? ""}
                         onChange={(e) =>
                           setForm({
@@ -174,6 +193,7 @@ export function SubmitResultDialog({
                 <div className="flex items-center gap-2">
                   <Checkbox
                     checked={form.hasPenalties}
+                    disabled={!canSubmit}
                     onCheckedChange={(c) =>
                       setForm({ ...form, hasPenalties: !!c })
                     }
@@ -187,6 +207,7 @@ export function SubmitResultDialog({
                       <Input
                         type="number"
                         min={0}
+                        disabled={!canSubmit}
                         value={form.penaltiesHomeScore ?? ""}
                         onChange={(e) =>
                           setForm({
@@ -201,6 +222,7 @@ export function SubmitResultDialog({
                       <Input
                         type="number"
                         min={0}
+                        disabled={!canSubmit}
                         value={form.penaltiesAwayScore ?? ""}
                         onChange={(e) =>
                           setForm({
@@ -217,24 +239,34 @@ export function SubmitResultDialog({
           </div>
         )}
         {error && <p className="text-sm text-destructive">{error}</p>}
-        <div className="rounded-lg border bg-muted/30 p-3">
-          <Button variant="outline" size="sm" disabled title="Reset result API is not implemented yet.">
-            Reset Result
-          </Button>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Reset result API is not implemented yet.
-          </p>
-        </div>
+        {canReset && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+            <p className="text-sm text-muted-foreground">
+              Clear scores and set the match back to scheduled.
+            </p>
+            <Button
+              variant="destructive"
+              size="sm"
+              className="mt-2"
+              disabled={resetMutation.isPending}
+              onClick={() => resetMutation.mutate()}
+            >
+              {resetMutation.isPending ? "Resetting..." : "Reset Result"}
+            </Button>
+          </div>
+        )}
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {canSubmit ? "Cancel" : "Close"}
           </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={isLocked || mutation.isPending}
-          >
-            {mutation.isPending ? "Submitting..." : "Submit Result"}
-          </Button>
+          {canSubmit && (
+            <Button
+              onClick={handleSubmit}
+              disabled={isCancelled || submitMutation.isPending}
+            >
+              {submitMutation.isPending ? "Submitting..." : "Submit Result"}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
